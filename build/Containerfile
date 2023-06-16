@@ -1,0 +1,11 @@
+FROM alpine:latest as certificates
+RUN apk update && apk add --no-cache ca-certificates && update-ca-certificates
+
+
+
+FROM scratch
+COPY --from=certificates /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY minio-backup /app/
+
+WORKDIR /app
+ENTRYPOINT [ "/app/minio-backup" ]

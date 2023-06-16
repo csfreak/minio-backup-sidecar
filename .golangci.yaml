@@ -1,0 +1,38 @@
+linters:
+  disable-all: true
+  enable:
+    - bodyclose
+    - errcheck
+    - goconst
+    - gocritic
+    - gofumpt
+    - gomnd
+    - gomoddirectives
+    - gosimple
+    - govet
+    - ineffassign
+    - revive
+    - staticcheck
+    - typecheck
+    - unused
+    - usestdlibvars
+    - whitespace
+    - wrapcheck
+    - wsl
+linters-settings:
+  wrapcheck:
+    ignoreSigs:
+      - .Errorf(
+      - errors.New(
+      - viper.BindPFlags(
+  gomnd:
+    ignored-functions:
+      - "klog.V"
+  errcheck:
+    exclude-functions:
+      - "(*pflag.FlagSet).Set(str, str)"
+      - "(*pflag.FlagSet).MarkHidden(str)"
+  revive:
+    rules:
+      - name: context-as-argument
+        disabled: true
