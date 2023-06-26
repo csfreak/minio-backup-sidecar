@@ -33,15 +33,28 @@ import (
 
 var waitGroup sync.WaitGroup
 
-func recursiveDirList(p string) (*[]string, error) {
+func checkDir(p string) (bool, error) {
 	info, err := os.Stat(p)
 	if err != nil {
-		klog.V(3).ErrorS(err, "unable to process path", "path", "p")
-		return nil, fmt.Errorf("unable to process path %s: %w", p, err)
+		return false, fmt.Errorf("unable to process path %s: %w", p, err)
 	}
 
-	if !info.IsDir() {
-		return nil, nil
+	if info.IsDir() {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func recursiveDirList(p string) (*[]string, error) {
+	if d, err := checkDir(p); err != nil || !d {
+		if err == nil {
+			err = fmt.Errorf("not a directory: %s", p)
+		}
+
+		klog.V(3).ErrorS(err, "unable to process path", "path", "p")
+
+		return nil, err
 	}
 
 	dirs := []string{p}
@@ -105,7 +118,7 @@ func setupSignalNotify(cancel context.CancelFunc) {
 }
 
 func callUpload(p *fsPath, file string, ctx context.Context) {
-	klog.V(2).Info("uploading file", "file", file)
+	klog.V(2).InfoS("uploading file", "file", file)
 
 	if err := ctx.Value(config.MC).(minio.MinioClient).UploadFileWithDestination(file, p.Destination, ctx); err != nil {
 		klog.ErrorS(err, "failed upload", "file", file, "fsPath", p)

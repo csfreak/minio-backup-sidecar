@@ -20,7 +20,6 @@ package fs
 import (
 	"context"
 	"errors"
-	"log"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
@@ -112,7 +111,21 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 						switch e {
 						case CreateEvent:
 							if event.Has(fsnotify.Create) {
-								callUpload(p, event.Name, watchCtx)
+								d, err := checkDir(event.Name)
+								if err != nil {
+									break
+								}
+
+								if d {
+									klog.V(4).InfoS("adding new directory", "dir", event.Name, "path", p)
+
+									err = watcher.Add(event.Name)
+									if err != nil {
+										klog.ErrorS(err, "unable to setup watcher")
+									}
+								} else {
+									callUpload(p, event.Name, watchCtx)
+								}
 							}
 						case WriteEvent:
 							if event.Has(fsnotify.Write) {
@@ -123,10 +136,6 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 								callDelete(p, event.Name, watchCtx)
 							}
 						}
-					}
-
-					if event.Has(fsnotify.Write) {
-						log.Println("modified file:", event.Name)
 					}
 
 				case err, ok := <-watcher.Errors:
