@@ -165,7 +165,7 @@ func (c *minioConfig) UploadFileWithDestination(file string, dest config.Destina
 		objName = dest.Name
 	}
 
-	klog.V(2).InfoS("uploading file", "file", "file", "destination", "objName", "content-type", dest.Type)
+	klog.V(2).InfoS("uploading file", "file", file, "destination", objName, "content-type", dest.Type)
 
 	info, err := c.client.FPutObject(ctx, c.bucket, objName, file, mc.PutObjectOptions{ContentType: dest.Type})
 	if err != nil {
