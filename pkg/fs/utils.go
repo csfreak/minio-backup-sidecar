@@ -21,9 +21,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/signal"
 	"path"
-	"syscall"
 
 	"github.com/csfreak/minio-backup-sidecar/pkg/config"
 	"github.com/csfreak/minio-backup-sidecar/pkg/minio"
@@ -99,15 +97,6 @@ func fileList(p string) (*[]string, error) {
 	}
 
 	return &files, nil
-}
-
-func setupSignalNotify(cancel context.CancelFunc) {
-	cancelChan := make(chan os.Signal, 1)
-	signal.Notify(cancelChan, syscall.SIGTERM, syscall.SIGINT)
-
-	sig := <-cancelChan
-	klog.InfoS("shutting down", "signal", sig)
-	cancel()
 }
 
 func callUpload(p *fsPath, file string, ctx context.Context) {

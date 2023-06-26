@@ -19,42 +19,18 @@ package fs
 
 import (
 	"context"
-	"sync"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"k8s.io/klog/v2"
 )
 
-var waitGroup sync.WaitGroup
+func setupSignalNotify(cancel context.CancelFunc) {
+	cancelChan := make(chan os.Signal, 1)
+	signal.Notify(cancelChan, syscall.SIGTERM, syscall.SIGINT)
 
-func (c *Config) Process(ctx context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
-
-	go setupSignalNotify(cancel)
-
-	for _, p := range c.Paths {
-		doConfigPath(p, ctx)
-	}
-
-	waitGroup.Wait()
-}
-
-func doConfigPath(p *fsPath, ctx context.Context) {
-	klog.V(4).InfoS("processing path", "fsPath", p)
-
-	if p.Watch {
-		startNewWatcher(p, ctx, &waitGroup)
-	} else {
-		waitGroup.Add(1)
-		go func() {
-			f, err := fileList(p.Path)
-			if err != nil {
-				klog.ErrorS(err, "unable to process path", "path", p.Path)
-				return
-			}
-			for _, file := range *f {
-				callUpload(p, file, ctx)
-			}
-			waitGroup.Done()
-		}()
-	}
+	sig := <-cancelChan
+	klog.InfoS("shutting down", "signal", sig)
+	cancel()
 }
