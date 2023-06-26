@@ -96,7 +96,9 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 				select {
 				case event, ok := <-watcher.Events:
 					if !ok {
+						klog.V(2).ErrorS(err, "watcher closed")
 						watchCancel()
+
 						return
 					}
 
@@ -142,6 +144,7 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 		}
 
 		if len(watcher.WatchList()) == 0 {
+			klog.V(2).ErrorS(err, "no watchers running")
 			watchCancel()
 		}
 
