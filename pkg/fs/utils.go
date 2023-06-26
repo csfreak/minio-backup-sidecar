@@ -44,7 +44,7 @@ func recursiveDirList(p string) (*[]string, error) {
 		return nil, nil
 	}
 
-	dirs := []string{}
+	dirs := []string{p}
 
 	fs, err := os.ReadDir(p)
 	if err != nil {
