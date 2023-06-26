@@ -42,7 +42,7 @@ func doConfigPath(p *fsPath, ctx context.Context) {
 	klog.V(4).InfoS("processing path", "fsPath", p)
 
 	if p.Watch {
-		klog.V(3).InfoS("watching path", "path", p.Path)
+		klog.V(3).InfoS("start watching path", "path", p.Path)
 		doWatchPath(p, ctx)
 	} else {
 		go func() {
@@ -73,6 +73,8 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 		var watchPaths []string
 
 		if p.Recursive {
+			klog.V(4).InfoS("watching path recursively", "path", p.Path)
+
 			dirs, err := recursiveDirList(p.Path)
 			if err != nil {
 				klog.ErrorS(err, "unable to recurse path", "path", p.Path)
@@ -80,6 +82,8 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 
 			if dirs != nil {
 				watchPaths = *dirs
+			} else {
+				klog.Warning("no paths found to watch", "path", p.Path)
 			}
 		} else {
 			watchPaths = []string{p.Path}
@@ -137,6 +141,8 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 		}()
 
 		for _, watch := range watchPaths {
+			klog.V(4).InfoS("add inotify watcher to path", "path", p.Path)
+
 			err = watcher.Add(watch)
 			if err != nil {
 				klog.ErrorS(err, "unable to setup watcher")
