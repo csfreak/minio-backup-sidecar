@@ -23,7 +23,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"sync"
 	"syscall"
 
 	"github.com/csfreak/minio-backup-sidecar/pkg/config"
@@ -31,27 +30,21 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var waitGroup sync.WaitGroup
-
-func checkDir(p string) (bool, error) {
+func checkDir(p string) error {
 	info, err := os.Stat(p)
 	if err != nil {
-		return false, fmt.Errorf("unable to process path %s: %w", p, err)
+		return fmt.Errorf("unable to process path %s: %w", p, err)
 	}
 
-	if info.IsDir() {
-		return true, nil
+	if !info.IsDir() {
+		return fmt.Errorf("not a directory: %s", p)
 	}
 
-	return false, nil
+	return nil
 }
 
 func recursiveDirList(p string) (*[]string, error) {
-	if d, err := checkDir(p); err != nil || !d {
-		if err == nil {
-			err = fmt.Errorf("not a directory: %s", p)
-		}
-
+	if err := checkDir(p); err != nil {
 		klog.V(3).ErrorS(err, "unable to process path", "path", "p")
 
 		return nil, err
@@ -122,6 +115,13 @@ func callUpload(p *fsPath, file string, ctx context.Context) {
 
 	if err := ctx.Value(config.MC).(minio.MinioClient).UploadFileWithDestination(file, p.Destination, ctx); err != nil {
 		klog.ErrorS(err, "failed upload", "file", file, "fsPath", p)
+		return
+	}
+
+	if p.DeleteOnSuccess {
+		if err := os.Remove(file); err != nil {
+			klog.ErrorS(err, "failed to remove uploaded file", "file", file)
+		}
 	}
 }
 

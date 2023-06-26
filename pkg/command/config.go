@@ -34,4 +34,5 @@ func initConfig() {
 	viper.SetDefault("watch", true)
 	viper.SetDefault("recursive", false)
 	viper.SetDefault("watch-events", []string{"Create", "Write"})
+	viper.SetDefault("delete-on-success", false)
 }
