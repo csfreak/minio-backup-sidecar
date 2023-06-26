@@ -29,24 +29,23 @@ import (
 	"k8s.io/klog/v2"
 )
 
-type Event string
-
-const (
-	CreateEvent Event = "Create"
-	WriteEvent  Event = "Write"
-	RemoveEvent Event = "Remove"
-)
-
 type Config struct {
 	Paths []*fsPath
 }
 
+type Events struct {
+	Create bool
+	Write  bool
+	Remove bool
+}
+
 type fsPath struct {
-	Watch       bool    // Watch Path or process once (Defaults to true)
-	Recursive   bool    // Watch Path Recursively (only applies if Path is a Directory) (Defaults to false)
-	Path        string  // Path of File or Directory
-	Events      []Event // What Events to Watch (Create, Write, Update) (only applies if Watch = True)
-	Destination config.Destination
+	DeleteOnSuccess bool    // Delete files after successful upload
+	Watch           bool    // Watch Path or process once (Defaults to true)
+	Recursive       bool    // Watch Path Recursively (only applies if Path is a Directory) (Defaults to false)
+	Path            string  // Path of File or Directory
+	Events          *Events // What Events to Watch (Create, Write, Remove) (only applies if Watch = True)
+	Destination     config.Destination
 }
 
 func New() (*Config, error) {
@@ -84,7 +83,7 @@ func New() (*Config, error) {
 				fsp.Watch = viper.GetBool(fmt.Sprintf("files.%d.watch", i))
 			}
 			if viper.IsSet(fmt.Sprintf("files.%d.recursive", i)) {
-				fsp.Watch = viper.GetBool(fmt.Sprintf("files.%d.recursive", i))
+				fsp.Recursive = viper.GetBool(fmt.Sprintf("files.%d.recursive", i))
 			}
 			if viper.IsSet(fmt.Sprintf("files.%d.events", i)) {
 				events, err := ParseEvents(viper.GetStringSlice(fmt.Sprintf("files.%d.events", i)))
@@ -93,6 +92,9 @@ func New() (*Config, error) {
 					continue
 				}
 				fsp.Events = events
+			}
+			if viper.IsSet(fmt.Sprintf("files.%d.delete-on-success", i)) {
+				fsp.DeleteOnSuccess = viper.GetBool(fmt.Sprintf("files.%d.delete-on-success", i))
 			}
 			if viper.IsSet("files.%d.destination.name") {
 				if fsp.Destination.Name != "" {
@@ -112,6 +114,10 @@ func New() (*Config, error) {
 
 	if len(c.Paths) == 0 {
 		return nil, errors.New("no paths found")
+	}
+
+	if err := c.validate(); err != nil {
+		return nil, fmt.Errorf("invalid config: %v", err)
 	}
 
 	return c, nil
@@ -141,10 +147,11 @@ func newPath(p string) (*fsPath, error) {
 	}
 
 	return &fsPath{
-		Watch:     viper.GetBool("watch"),
-		Recursive: viper.GetBool("recursive"),
-		Path:      p,
-		Events:    events,
+		Watch:           viper.GetBool("watch"),
+		Recursive:       viper.GetBool("recursive"),
+		DeleteOnSuccess: viper.GetBool("delete-on-success"),
+		Path:            p,
+		Events:          events,
 		Destination: config.Destination{
 			Name: filename,
 			Path: filepath,
@@ -152,34 +159,67 @@ func newPath(p string) (*fsPath, error) {
 	}, nil
 }
 
-func ParseEvent(e string) (Event, error) {
-	switch strings.ToLower(e) {
+func (e *Events) setEvent(name string) error {
+	switch strings.ToLower(name) {
 	case "create":
-		return CreateEvent, nil
+		e.Create = true
 	case "write", "update":
-		return WriteEvent, nil
+		e.Write = true
 	case "remove", "delete":
-		return RemoveEvent, nil
+		e.Remove = true
+	default:
+		return fmt.Errorf("unable to parse event %s", name)
 	}
 
-	return Event(""), fmt.Errorf("unable to parse %s into %T", e, Event(""))
+	return nil
 }
 
-func ParseEvents(eventNames []string) ([]Event, error) {
-	events := []Event{}
+func newEvents() *Events {
+	return &Events{
+		Create: false,
+		Write:  false,
+		Remove: false,
+	}
+}
 
+func ParseEvents(eventNames []string) (*Events, error) {
+	e := newEvents()
 	for _, name := range eventNames {
-		e, err := ParseEvent(name)
+		err := e.setEvent(name)
 		if err != nil {
-			return events, err
+			return e, err
+		}
+	}
+
+	return e, nil
+}
+
+func (c *Config) validate() error {
+	for _, p := range c.Paths {
+		if p.Watch {
+			if err := checkDir(p.Path); err != nil {
+				if p.Recursive {
+					return fmt.Errorf("cannot recursively watch non-directory file: %s", p.Path)
+				}
+
+				if p.DeleteOnSuccess {
+					return fmt.Errorf("cannot use delete-on-success and watch on non-directory file: %s", p.Path)
+				}
+			}
+
+			if !(p.Events.Create || p.Events.Write || p.Events.Remove) {
+				return fmt.Errorf("cannot set watch without any events: %s", p.Path)
+			}
+		} else {
+			p.Recursive = false
+			p.DeleteOnSuccess = false
+			p.Events = newEvents()
 		}
 
-		events = append(events, e)
+		if p.DeleteOnSuccess && p.Events.Remove {
+			return fmt.Errorf("cannot watch remove/delete events with delete-on-success: %s", p.Path)
+		}
 	}
 
-	return events, nil
-}
-
-func (e Event) String() string {
-	return string(e)
+	return nil
 }

@@ -20,10 +20,13 @@ package fs
 import (
 	"context"
 	"errors"
+	"sync"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
 )
+
+var waitGroup sync.WaitGroup
 
 func (c *Config) Process(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -69,7 +72,7 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 	go func() {
 		watchCtx, watchCancel := context.WithCancel(ctx)
 
-		var watchPaths []string
+		watchPaths := []string{p.Path}
 
 		if p.Recursive {
 			klog.V(4).InfoS("watching path recursively", "path", p.Path)
@@ -84,8 +87,6 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 			} else {
 				klog.Warning("no paths found to watch", "path", p.Path)
 			}
-		} else {
-			watchPaths = []string{p.Path}
 		}
 
 		watcher, err := fsnotify.NewWatcher()
@@ -107,35 +108,26 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 
 					klog.V(4).InfoS("watcher received event", "event", event, "fsPath", p)
 
-					for _, e := range p.Events {
-						switch e {
-						case CreateEvent:
-							if event.Has(fsnotify.Create) {
-								d, err := checkDir(event.Name)
-								if err != nil {
-									break
-								}
-
-								if d {
-									klog.V(4).InfoS("adding new directory", "dir", event.Name, "path", p)
-
-									err = watcher.Add(event.Name)
-									if err != nil {
-										klog.ErrorS(err, "unable to setup watcher")
-									}
-								} else {
-									callUpload(p, event.Name, watchCtx)
-								}
-							}
-						case WriteEvent:
-							if event.Has(fsnotify.Write) {
-								callUpload(p, event.Name, watchCtx)
-							}
-						case RemoveEvent:
-							if event.Has(fsnotify.Remove) {
-								callDelete(p, event.Name, watchCtx)
-							}
+					switch {
+					case event.Has(fsnotify.Create):
+						if err := checkDir(event.Name); err == nil {
+							klog.V(4).InfoS("adding new directory", "dir", event.Name, "path", p)
+							addDirToWatcher(watcher, event.Name)
+						} else if p.Events.Create {
+							callUpload(p, event.Name, watchCtx)
 						}
+
+					case event.Has(fsnotify.Write):
+						if p.Events.Create {
+							callUpload(p, event.Name, watchCtx)
+						}
+
+					case event.Has(fsnotify.Remove):
+						if p.Events.Remove {
+							callDelete(p, event.Name, watchCtx)
+						}
+
+						checkWatcher(watcher, watchCancel)
 					}
 
 				case err, ok := <-watcher.Errors:
@@ -149,23 +141,35 @@ func doWatchPath(p *fsPath, ctx context.Context) {
 			}
 		}()
 
-		for _, watch := range watchPaths {
-			klog.V(4).InfoS("add inotify watcher to path", "path", p.Path)
-
-			err = watcher.Add(watch)
-			if err != nil {
-				klog.ErrorS(err, "unable to setup watcher")
-			}
-		}
-
-		if len(watcher.WatchList()) == 0 {
-			klog.V(2).ErrorS(err, "no watchers running")
-			watchCancel()
-		}
+		addDirToWatcher(watcher, watchPaths...)
+		checkWatcher(watcher, watchCancel)
 
 		<-watchCtx.Done()
 		klog.V(2).InfoS("context canceled", "fsPath", p)
 		watcher.Close()
 		waitGroup.Done()
 	}()
+}
+
+func addDirToWatcher(watcher *fsnotify.Watcher, paths ...string) {
+	for _, p := range paths {
+		klog.V(4).InfoS("add inotify watcher", "path", p)
+
+		err := watcher.Add(p)
+		if err != nil {
+			klog.ErrorS(err, "unable to setup watcher")
+		}
+	}
+}
+
+func checkWatcher(watcher *fsnotify.Watcher, cancelFunc context.CancelFunc) {
+	klog.V(4).InfoS("check watcher", watcher.WatchList())
+
+	watch_count := len(watcher.WatchList())
+	klog.V(4).InfoS("check watcher", "count", watch_count)
+
+	if watch_count == 0 {
+		klog.V(2).Info("no watchers running")
+		cancelFunc()
+	}
 }
