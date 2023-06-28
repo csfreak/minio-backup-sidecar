@@ -39,7 +39,9 @@ func initFlags(flags *pflag.FlagSet) error {
 	flags.Bool("minio.secure", true, "Use SSL/TLS for Minio Client")
 
 	flags.BoolP("watch", "w", true, "Watch path for changes")
+	flags.Int("wait-time", 1, "Time (in seconds) to wait for more changes before upload")
 	flags.BoolP("recursive", "r", false, "Watch directory paths recursively")
+	flags.Bool("delete-on-success", false, "Delete file after upload")
 	flags.StringArray("path", []string{}, "Path to watch")
 	flags.StringArray("watch-events", []string{"Create", "Write"}, "Events to Watch")
 	flags.String("destination.name", "", "Object Name in bucket")

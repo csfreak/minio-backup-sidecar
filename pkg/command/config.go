@@ -35,4 +35,5 @@ func initConfig() {
 	viper.SetDefault("recursive", false)
 	viper.SetDefault("watch-events", []string{"Create", "Write"})
 	viper.SetDefault("delete-on-success", false)
+	viper.SetDefault("wait-time", 5)
 }

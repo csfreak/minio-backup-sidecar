@@ -42,6 +42,7 @@ type Events struct {
 type fsPath struct {
 	DeleteOnSuccess bool    // Delete files after successful upload
 	Watch           bool    // Watch Path or process once (Defaults to true)
+	WaitTime        int     // Tme in Seconds to wait for changes to file before action
 	Recursive       bool    // Watch Path Recursively (only applies if Path is a Directory) (Defaults to false)
 	Path            string  // Path of File or Directory
 	Events          *Events // What Events to Watch (Create, Write, Remove) (only applies if Watch = True)
@@ -81,6 +82,9 @@ func New() (*Config, error) {
 		} else {
 			if viper.IsSet(fmt.Sprintf("files.%d.watch", i)) {
 				fsp.Watch = viper.GetBool(fmt.Sprintf("files.%d.watch", i))
+			}
+			if viper.IsSet(fmt.Sprintf("files.%d.wait-time", i)) {
+				fsp.Watch = viper.GetBool(fmt.Sprintf("files.%d.wait-time", i))
 			}
 			if viper.IsSet(fmt.Sprintf("files.%d.recursive", i)) {
 				fsp.Recursive = viper.GetBool(fmt.Sprintf("files.%d.recursive", i))
@@ -148,6 +152,7 @@ func newPath(p string) (*fsPath, error) {
 
 	return &fsPath{
 		Watch:           viper.GetBool("watch"),
+		WaitTime:        viper.GetInt("wait-time"),
 		Recursive:       viper.GetBool("recursive"),
 		DeleteOnSuccess: viper.GetBool("delete-on-success"),
 		Path:            p,

@@ -20,7 +20,10 @@ package fs
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
 	"sync"
+	"time"
 
 	"github.com/fsnotify/fsnotify"
 	"k8s.io/klog/v2"
@@ -28,8 +31,11 @@ import (
 
 type watcher struct {
 	p        *fsPath
+	timers   map[string]*time.Timer
+	wait     time.Duration
 	_ctx     context.Context
 	_cancel  context.CancelFunc
+	_mu      sync.Mutex
 	_wg      *sync.WaitGroup
 	_watcher *fsnotify.Watcher
 }
@@ -43,8 +49,10 @@ func startNewWatcher(p *fsPath, ctx context.Context, wg *sync.WaitGroup) {
 	}
 
 	w := &watcher{
-		p:   p,
-		_wg: wg,
+		p:      p,
+		wait:   time.Duration(p.WaitTime) * time.Second,
+		timers: make(map[string]*time.Timer),
+		_wg:    wg,
 	}
 
 	w._ctx, w._cancel = context.WithCancel(ctx)
@@ -89,8 +97,59 @@ func (w *watcher) startWatcher() {
 		<-w._ctx.Done()
 		klog.V(2).InfoS("context canceled", "fsPath", w.p)
 		w._watcher.Close()
+
+		for _, t := range w.timers {
+			t.Stop()
+		}
+
 		waitGroup.Done()
 	}()
+}
+
+func (w *watcher) setTimer(e fsnotify.Event) {
+	var (
+		timer_func func(p *fsPath, path string, ctx context.Context)
+		timer_id   string
+	)
+
+	switch {
+	case e.Has(fsnotify.Create):
+		timer_func = callUpload
+		timer_id = fmt.Sprintf("upload-%s", e.Name)
+	case e.Has(fsnotify.Remove):
+		timer_func = callDelete
+		timer_id = fmt.Sprintf("delete-%s", e.Name)
+	case e.Has(fsnotify.Write):
+		timer_func = callUpload
+		timer_id = fmt.Sprintf("upload-%s", e.Name)
+	}
+
+	// Get timer.
+	w._mu.Lock()
+	t, ok := w.timers[timer_id]
+	w._mu.Unlock()
+
+	// No timer yet, so create one.
+	if !ok {
+		klog.V(4).InfoS("created timer", "id", timer_id)
+
+		t = time.AfterFunc(math.MaxInt64, func() {
+			timer_func(w.p, e.Name, w._ctx)
+
+			klog.V(4).InfoS("timer complete", "id", timer_id)
+			w._mu.Lock()
+			delete(w.timers, timer_id)
+			w._mu.Unlock()
+		})
+		t.Stop()
+
+		w._mu.Lock()
+		w.timers[timer_id] = t
+		w._mu.Unlock()
+	}
+
+	klog.V(4).InfoS("timer set", "id", timer_id)
+	t.Reset(w.wait)
 }
 
 func (w *watcher) startWatchLoop() {
@@ -113,17 +172,17 @@ func (w *watcher) startWatchLoop() {
 						klog.V(4).InfoS("adding new directory", "dir", event.Name, "path", w.p.Path)
 						w.addDir(event.Name)
 					} else if w.p.Events.Create {
-						callUpload(w.p, event.Name, w._ctx)
+						w.setTimer(event)
 					}
 
 				case event.Has(fsnotify.Write):
-					if w.p.Events.Create {
-						callUpload(w.p, event.Name, w._ctx)
+					if w.p.Events.Write {
+						w.setTimer(event)
 					}
 
 				case event.Has(fsnotify.Remove):
 					if w.p.Events.Remove {
-						callDelete(w.p, event.Name, w._ctx)
+						w.setTimer(event)
 					}
 
 					w.checkWatcher()
