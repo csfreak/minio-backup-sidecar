@@ -27,7 +27,8 @@ linters-settings:
       - viper.BindPFlags(
   gomnd:
     ignored-functions:
-      - "klog.V"
+      - '^klog\.V$'
+      - '^viper\.SetDefault$'
   errcheck:
     exclude-functions:
       - "(*pflag.FlagSet).Set(str, str)"
