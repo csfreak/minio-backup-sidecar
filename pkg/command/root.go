@@ -35,12 +35,12 @@ func Run(cmd *cobra.Command, args []string) {
 
 	mc, err := minio.New(cmd.Context())
 	if err != nil {
-		klog.Fatalf("%v", err)
+		klog.Fatalf("unable to initialize minio: %v", err)
 	}
 
 	f, err := fs.New()
 	if err != nil {
-		klog.Fatalf("%v", err)
+		klog.Fatalf("unable to initialize fs: %v", err)
 	}
 
 	f.Process(context.WithValue(cmd.Context(), config.MC, mc))
@@ -50,6 +50,6 @@ func Init(cmd *cobra.Command) {
 	initConfig()
 
 	if err := initFlags(cmd.Flags()); err != nil {
-		klog.Fatalf("unable to configure", "error", err)
+		klog.Fatalf("unable to configure: %v", err)
 	}
 }
