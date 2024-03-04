@@ -62,14 +62,18 @@ func New() (*Config, error) {
 					if fsp.Destination.Name != "" {
 						klog.Warningf("setting destination.name for directory %s may result in files being overwritten", fsp.Path)
 					}
+
 					fsp.Destination.Name = viper.GetString("destination.name")
 				}
+
 				if viper.IsSet("destination.path") {
 					fsp.Destination.Path = viper.GetString("destination.path")
 				}
+
 				if viper.IsSet("destination.type") {
 					fsp.Destination.Path = viper.GetString("destination.type")
 				}
+
 				c.Paths = append(c.Paths, fsp)
 			}
 		}
@@ -83,35 +87,45 @@ func New() (*Config, error) {
 			if viper.IsSet(fmt.Sprintf("files.%d.watch", i)) {
 				fsp.Watch = viper.GetBool(fmt.Sprintf("files.%d.watch", i))
 			}
+
 			if viper.IsSet(fmt.Sprintf("files.%d.wait-time", i)) {
 				fsp.Watch = viper.GetBool(fmt.Sprintf("files.%d.wait-time", i))
 			}
+
 			if viper.IsSet(fmt.Sprintf("files.%d.recursive", i)) {
 				fsp.Recursive = viper.GetBool(fmt.Sprintf("files.%d.recursive", i))
 			}
+
 			if viper.IsSet(fmt.Sprintf("files.%d.events", i)) {
 				events, err := ParseEvents(viper.GetStringSlice(fmt.Sprintf("files.%d.events", i)))
 				if err != nil {
 					klog.ErrorS(err, "error processing path")
 					continue
 				}
+
 				fsp.Events = events
 			}
+
 			if viper.IsSet(fmt.Sprintf("files.%d.delete-on-success", i)) {
 				fsp.DeleteOnSuccess = viper.GetBool(fmt.Sprintf("files.%d.delete-on-success", i))
 			}
+
 			if viper.IsSet("files.%d.destination.name") {
 				if fsp.Destination.Name != "" {
 					klog.Warningf("setting destination.name for directory %s may result in files being overwritten", fsp.Path)
 				}
+
 				fsp.Destination.Name = viper.GetString(fmt.Sprintf("files.%d.destination.name", i))
 			}
+
 			if viper.IsSet(fmt.Sprintf("files.%d.destination.path", i)) {
 				fsp.Destination.Path = viper.GetString(fmt.Sprintf("files.%d.destination.name", i))
 			}
+
 			if viper.IsSet(fmt.Sprintf("files.%d.destination.type", i)) {
 				fsp.Destination.Type = viper.GetString(fmt.Sprintf("files.%d.destination.name", i))
 			}
+
 			c.Paths = append(c.Paths, fsp)
 		}
 	}
