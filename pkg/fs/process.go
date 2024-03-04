@@ -45,6 +45,7 @@ func doConfigPath(p *fsPath, ctx context.Context) {
 		startNewWatcher(p, ctx, &waitGroup)
 	} else {
 		waitGroup.Add(1)
+
 		go func() {
 			f, err := fileList(p.Path)
 			if err != nil {
