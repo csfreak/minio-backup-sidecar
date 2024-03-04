@@ -51,9 +51,11 @@ func doConfigPath(p *fsPath, ctx context.Context) {
 				klog.ErrorS(err, "unable to process path", "path", p.Path)
 				return
 			}
+
 			for _, file := range *f {
 				callUpload(p, file, ctx)
 			}
+
 			waitGroup.Done()
 		}()
 	}
