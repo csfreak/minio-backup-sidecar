@@ -60,7 +60,7 @@ jobs:
             org.opencontainers.image.created=${{github.event.head_commit.timestamp}}
             org.opencontainers.image.title=minio-backup-sidecar
             org.opencontainers.image.revision=${{github.sha}}
-            org.opencontainers.image.version=${{steps.version.outputs.version_tag}}
+            org.opencontainers.image.version=${{steps.release.outputs.version}}
             org.opencontainers.image.description=Sidecar containter to watch files and upload changes to minio
 
       - name: Push image
