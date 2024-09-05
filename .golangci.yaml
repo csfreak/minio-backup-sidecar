@@ -6,7 +6,7 @@ linters:
     - goconst
     - gocritic
     - gofumpt
-    - gomnd
+    - mnd
     - gomoddirectives
     - gosimple
     - govet
@@ -25,7 +25,7 @@ linters-settings:
       - .Errorf(
       - errors.New(
       - viper.BindPFlags(
-  gomnd:
+  mnd:
     ignored-functions:
       - '^klog\.V$'
       - '^viper\.SetDefault$'
