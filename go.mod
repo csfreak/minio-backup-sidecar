@@ -5,7 +5,7 @@ go 1.22
 toolchain go1.22.0
 
 require (
-	github.com/fsnotify/fsnotify v1.7.0
+	github.com/fsnotify/fsnotify v1.8.0
 	github.com/minio/minio-go/v7 v7.0.76
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
